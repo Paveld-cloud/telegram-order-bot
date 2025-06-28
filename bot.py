@@ -100,18 +100,19 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         quantity = context.user_data.get("quantity")
         name = context.user_data.get("name")
         phone = context.user_data.get("phone")
+        user_id = update.effective_user.id
         total = 30000 * quantity
         commission = total * 0.10
 
-       payload = {
-    "user_id": update.effective_user.id,  # 👈 добавь это
-    "product": product,
-    "quantity": quantity,
-    "name": name,
-    "phone": phone,
-    "total": total,
-    "commission": commission
-}
+        payload = {
+            "user_id": user_id,
+            "product": product,
+            "quantity": quantity,
+            "name": name,
+            "phone": phone,
+            "total": total,
+            "commission": commission
+        }
 
         try:
             requests.post(MAKE_WEBHOOK_URL, json=payload)
@@ -123,7 +124,7 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         client = gspread.authorize(creds)
         sheet = client.open_by_url(SPREADSHEET_URL).worksheet(HISTORY_SHEET_NAME)
         sheet.append_row([
-            str(update.effective_user.id),
+            str(user_id),
             product,
             quantity,
             total,
