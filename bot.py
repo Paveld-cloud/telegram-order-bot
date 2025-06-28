@@ -118,8 +118,7 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Запуск бота
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
-
-    conv_handler = ConversationHandler(
+ conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)],
         states={
             ASK_QUANTITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_quantity)],
