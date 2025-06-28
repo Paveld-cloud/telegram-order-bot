@@ -1,10 +1,9 @@
 import os
+import json
 import requests
 import gspread
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
-
-# Авторизация в Google Sheets
 from google.oauth2.service_account import Credentials
 
 # Переменные
@@ -13,25 +12,25 @@ MAKE_WEBHOOK_URL = os.getenv("MAKE_WEBHOOK_URL")
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1CPRIxtXQ_2IMVsSesMoHYuBTmjnEWDC8R6mR4BAhvEk/edit"
 SHEET_NAME = "Лист1"
 
-# Настройки
 ITEMS_PER_PAGE = 5
 user_state = {}
 
 # Подключение к Google Таблице
 def load_catalog():
-    creds = Credentials.from_service_account_file("credentials.json", scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
+    creds_info = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
+    creds = Credentials.from_service_account_info(creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
     client = gspread.authorize(creds)
     sheet = client.open_by_url(SPREADSHEET_URL).worksheet(SHEET_NAME)
     data = sheet.col_values(1)
-    return [row.strip() for row in data if row.strip()][1:]  # Пропускаем заголовок
+    return [row.strip() for row in data if row.strip()][1:]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user_state[user_id] = 0  # первая страница
+    user_state[user_id] = 0
     catalog = load_catalog()
     page = catalog[:ITEMS_PER_PAGE]
     message = "\n".join([f"{i+1}. {item}" for i, item in enumerate(page)])
-    await update.message.reply_text(f"🌹 Каталог роз (1–{ITEMS_PER_PAGE}):\n{message}\n\nНапиши название сорта или нажми /ещё")
+    await update.message.reply_text(f"🌹 Каталог роз (1–{ITEMS_PER_PAGE}):\n{message}\n\nНапиши название сорта или нажми /more")
 
 async def more(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -45,7 +44,7 @@ async def more(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_state[user_id] = current_page
     message = "\n".join([f"{i+1+start_index}. {item}" for i, item in enumerate(page)])
-    await update.message.reply_text(f"🌹 Каталог (поз. {start_index+1}–{min(end_index, len(catalog))}):\n{message}\n\nНапиши название сорта или /ещё")
+    await update.message.reply_text(f"🌹 Каталог (поз. {start_index+1}–{min(end_index, len(catalog))}):\n{message}\n\nНапиши название сорта или /more")
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     product = update.message.text.strip()
@@ -55,7 +54,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     context.user_data["product"] = product
     await update.message.reply_text("Сколько штук?")
-    return
 
 async def handle_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -65,8 +63,6 @@ async def handle_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введите число — сколько штук?")
         return
     await update.message.reply_text("Введите ваше имя:")
-
-    return
 
 async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["name"] = update.message.text.strip()
