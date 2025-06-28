@@ -94,46 +94,53 @@ async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return PHONE
 
 async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["phone"] = update.message.text.strip()
-    product = context.user_data.get("product")
-    quantity = context.user_data.get("quantity")
-    name = context.user_data.get("name")
-    phone = context.user_data.get("phone")
-    total = 30000 * quantity
-    commission = total * 0.10
-
-    payload = {
-        "product": product,
-        "quantity": quantity,
-        "name": name,
-        "phone": phone,
-        "total": total,
-        "commission": commission
-    }
-
     try:
-        requests.post(MAKE_WEBHOOK_URL, json=payload)
+        context.user_data["phone"] = update.message.text.strip()
+        product = context.user_data.get("product")
+        quantity = context.user_data.get("quantity")
+        name = context.user_data.get("name")
+        phone = context.user_data.get("phone")
+        total = 30000 * quantity
+        commission = total * 0.10
+
+        payload = {
+            "product": product,
+            "quantity": quantity,
+            "name": name,
+            "phone": phone,
+            "total": total,
+            "commission": commission
+        }
+
+        try:
+            requests.post(MAKE_WEBHOOK_URL, json=payload)
+        except Exception as e:
+            print("Webhook error:", e)
+
+        creds_info = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
+        creds = Credentials.from_service_account_info(creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        client = gspread.authorize(creds)
+        sheet = client.open_by_url(SPREADSHEET_URL).worksheet(HISTORY_SHEET_NAME)
+        sheet.append_row([
+            str(update.effective_user.id),
+            product,
+            quantity,
+            total,
+            name,
+            phone,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ])
+
+        await update.message.reply_text(
+            f"✅ Заказ оформлен!\nСорт: {product}\nКол-во: {quantity}\nСумма: {total} сум\nСкоро с вами свяжется менеджер.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return ConversationHandler.END
+
     except Exception as e:
-        print("Webhook error:", e)
-
-    # запись в историю
-    creds_info = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
-    creds = Credentials.from_service_account_info(creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-    client = gspread.authorize(creds)
-    sheet = client.open_by_url(SPREADSHEET_URL).worksheet(HISTORY_SHEET_NAME)
-    sheet.append_row([
-        str(update.effective_user.id),
-        product,
-        quantity,
-        total,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    ])
-
-    await update.message.reply_text(
-        f"✅ Заказ оформлен!\nСорт: {product}\nКол-во: {quantity}\nСумма: {total} сум\nСкоро с вами свяжется менеджер.",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return ConversationHandler.END
+        print("Ошибка в handle_phone:", e)
+        await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
+        return ConversationHandler.END
 
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
