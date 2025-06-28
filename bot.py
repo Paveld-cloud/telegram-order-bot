@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import gspread
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -115,7 +115,8 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("Webhook error:", e)
 
     await update.message.reply_text(
-        f"✅ Заказ оформлен!\nСорт: {product}\nКол-во: {quantity}\nСумма: {total} сум\nСкоро с вами свяжется менеджер."
+        f"✅ Заказ оформлен!\nСорт: {product}\nКол-во: {quantity}\nСумма: {total} сум\nСкоро с вами свяжется менеджер.",
+        reply_markup=ReplyKeyboardRemove()
     )
     return ConversationHandler.END
 
