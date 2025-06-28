@@ -103,14 +103,15 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = 30000 * quantity
         commission = total * 0.10
 
-        payload = {
-            "product": product,
-            "quantity": quantity,
-            "name": name,
-            "phone": phone,
-            "total": total,
-            "commission": commission
-        }
+       payload = {
+    "user_id": update.effective_user.id,  # 👈 добавь это
+    "product": product,
+    "quantity": quantity,
+    "name": name,
+    "phone": phone,
+    "total": total,
+    "commission": commission
+}
 
         try:
             requests.post(MAKE_WEBHOOK_URL, json=payload)
