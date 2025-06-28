@@ -3,7 +3,6 @@ import os
 import json
 import requests
 import gspread
-from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
@@ -21,7 +20,6 @@ TOKEN = os.getenv("BOT_TOKEN")
 MAKE_WEBHOOK_URL = os.getenv("MAKE_WEBHOOK_URL")
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1CPRIxtXQ_2IMVsSesMoHYuBTmjnEWDC8R6mR4BAhvEk/edit"
 SHEET_NAME = "Лист1"
-HISTORY_SHEET_NAME = "История"
 ITEMS_PER_PAGE = 5
 user_state = {}
 
@@ -120,19 +118,6 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print("Webhook error:", e)
 
-        creds_info = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
-        creds = Credentials.from_service_account_info(creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-        client = gspread.authorize(creds)
-        sheet = client.open_by_url(SPREADSHEET_URL).worksheet(HISTORY_SHEET_NAME)
-        sheet.append_row([
-            str(user_id),
-            product,
-            quantity,
-            name,
-            phone,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ])
-
         await update.message.reply_text(
             f"✅ Заказ оформлен!\nСорт: {product}\nКол-во: {quantity}\nСумма: {total} сум\nСкоро с вами свяжется менеджер.",
             reply_markup=ReplyKeyboardRemove()
@@ -143,24 +128,6 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("Ошибка в handle_phone:", e)
         await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
         return ConversationHandler.END
-
-async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    creds_info = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
-    creds = Credentials.from_service_account_info(creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-    client = gspread.authorize(creds)
-    sheet = client.open_by_url(SPREADSHEET_URL).worksheet(HISTORY_SHEET_NAME)
-    data = sheet.get_all_records()
-    user_orders = [row for row in data if str(row.get("user_id")) == user_id]
-
-    if not user_orders:
-        await update.message.reply_text("📬 У вас пока нет заказов.")
-        return
-
-    message = "📦 Ваша история заказов:\n\n"
-    for order in user_orders[-5:]:
-        message += f"🌹 {order['product']} — {order['quantity']} шт — {order['total']} сум\n🕒 {order['timestamp']}\n\n"
-    await update.message.reply_text(message)
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
@@ -174,10 +141,10 @@ def main():
             PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)],
         },
         fallbacks=[],
+        per_message=True
     )
 
     app.add_handler(conv_handler)
-    app.add_handler(CommandHandler("history", history))
     app.run_polling()
 
 if __name__ == "__main__":
