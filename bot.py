@@ -2,13 +2,14 @@ import os
 import json
 import requests
 import gspread
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     ContextTypes,
     MessageHandler,
     ConversationHandler,
+    CallbackQueryHandler,
     filters,
 )
 from google.oauth2.service_account import Credentials
@@ -40,37 +41,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_state[user_id] = 0
     catalog = load_catalog()
     page = catalog[:ITEMS_PER_PAGE]
-    message = "\n".join([f"{i+1}. {item}" for i, item in enumerate(page)])
-    await update.message.reply_text(
-        f"🌹 Каталог роз (1–{ITEMS_PER_PAGE}):\n{message}\n\nНапиши название сорта или нажми /more"
-    )
+    keyboard = [[InlineKeyboardButton(text=item, callback_data=item)] for item in page]
+    keyboard.append([InlineKeyboardButton(text="Ещё", callback_data="more")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("🌹 Выберите сорт роз:", reply_markup=reply_markup)
     return PRODUCT
 
-async def more(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+async def more_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
     catalog = load_catalog()
     current_page = user_state.get(user_id, 0) + 1
     start_index = current_page * ITEMS_PER_PAGE
     end_index = start_index + ITEMS_PER_PAGE
     page = catalog[start_index:end_index]
     if not page:
-        await update.message.reply_text("📦 Это был конец списка.")
+        await query.edit_message_text("📦 Это был конец списка.")
         return PRODUCT
     user_state[user_id] = current_page
-    message = "\n".join([f"{i+1+start_index}. {item}" for i, item in enumerate(page)])
-    await update.message.reply_text(
-        f"🌹 Каталог (поз. {start_index+1}–{min(end_index, len(catalog))}):\n{message}\n\nНапиши название сорта или /more"
-    )
+    keyboard = [[InlineKeyboardButton(text=item, callback_data=item)] for item in page]
+    keyboard.append([InlineKeyboardButton(text="Ещё", callback_data="more")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text("🌹 Выберите сорт роз:", reply_markup=reply_markup)
     return PRODUCT
 
-async def handle_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    product = update.message.text.strip()
-    catalog = load_catalog()
-    if product not in catalog:
-        await update.message.reply_text("❌ Такого сорта нет в каталоге. Попробуй снова.")
-        return PRODUCT
+async def handle_product_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    product = query.data
+    if product == "more":
+        return await more_callback(update, context)
     context.user_data["product"] = product
-    await update.message.reply_text("Сколько штук?")
+    await query.edit_message_text(f"Вы выбрали: {product}\nСколько штук?")
     return QUANTITY
 
 async def handle_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -123,8 +126,7 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             PRODUCT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_product),
-                CommandHandler("more", more)
+                CallbackQueryHandler(handle_product_callback),
             ],
             QUANTITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_quantity)],
             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name)],
@@ -138,4 +140,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
