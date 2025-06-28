@@ -128,8 +128,6 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             product,
             quantity,
             total,
-            name,
-            phone,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ])
 
@@ -154,7 +152,7 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_orders = [row for row in data if str(row.get("user_id")) == user_id]
 
     if not user_orders:
-        await update.message.reply_text("📭 У вас пока нет заказов.")
+        await update.message.reply_text("📬 У вас пока нет заказов.")
         return
 
     message = "📦 Ваша история заказов:\n\n"
