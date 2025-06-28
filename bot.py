@@ -2,7 +2,6 @@ import os
 import json
 import requests
 import gspread
-from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
@@ -14,26 +13,21 @@ from telegram.ext import (
     filters,
 )
 from google.oauth2.service_account import Credentials
-import asyncio
 
-# Переменные
+# Переменные окружения
 TOKEN = os.getenv("BOT_TOKEN")
 MAKE_WEBHOOK_URL = os.getenv("MAKE_WEBHOOK_URL")
-RAILWAY_WEBHOOK_URL = os.getenv("RAILWAY_WEBHOOK_URL")
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1CPRIxtXQ_2IMVsSesMoHYuBTmjnEWDC8R6mR4BAhvEk/edit"
 SHEET_NAME = "Лист1"
 ITEMS_PER_PAGE = 5
 user_state = {}
 
-# Conversation States
+# Этапы диалога
 PRODUCT, QUANTITY, NAME, PHONE = range(4)
 
 def load_catalog():
     creds_info = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
-    creds = Credentials.from_service_account_info(
-        creds_info,
-        scopes=["https://www.googleapis.com/auth/spreadsheets"],
-    )
+    creds = Credentials.from_service_account_info(creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
     client = gspread.authorize(creds)
     sheet = client.open_by_url(SPREADSHEET_URL).worksheet(SHEET_NAME)
     data = sheet.col_values(1)
@@ -131,7 +125,7 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
         return ConversationHandler.END
 
-async def main():
+def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
@@ -143,24 +137,10 @@ async def main():
             PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)],
         },
         fallbacks=[],
-        per_message=True,
     )
 
     app.add_handler(conv_handler)
-
-    WEBHOOK_PATH = f"/webhook/{TOKEN}"
-    WEBHOOK_URL = RAILWAY_WEBHOOK_URL + WEBHOOK_PATH
-
-    await app.initialize()
-    await app.start()
-    await app.bot.set_webhook(url=WEBHOOK_URL)
-    await app.updater.start_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 8000)),
-        url_path=WEBHOOK_PATH,
-        webhook_url=WEBHOOK_URL,
-    )
-    await app.updater.idle()
+    app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
