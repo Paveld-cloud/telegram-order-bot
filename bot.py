@@ -1,8 +1,8 @@
-
 import os
 import json
 import requests
 import gspread
+from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
@@ -14,10 +14,12 @@ from telegram.ext import (
     filters,
 )
 from google.oauth2.service_account import Credentials
+import asyncio
 
 # Переменные
 TOKEN = os.getenv("BOT_TOKEN")
 MAKE_WEBHOOK_URL = os.getenv("MAKE_WEBHOOK_URL")
+RAILWAY_WEBHOOK_URL = os.getenv("RAILWAY_WEBHOOK_URL")
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1CPRIxtXQ_2IMVsSesMoHYuBTmjnEWDC8R6mR4BAhvEk/edit"
 SHEET_NAME = "Лист1"
 ITEMS_PER_PAGE = 5
@@ -129,7 +131,7 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
         return ConversationHandler.END
 
-def main():
+async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
@@ -141,11 +143,24 @@ def main():
             PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)],
         },
         fallbacks=[],
-        per_message=True
+        per_message=True,
     )
 
     app.add_handler(conv_handler)
-    app.run_polling()
+
+    WEBHOOK_PATH = f"/webhook/{TOKEN}"
+    WEBHOOK_URL = RAILWAY_WEBHOOK_URL + WEBHOOK_PATH
+
+    await app.initialize()
+    await app.start()
+    await app.bot.set_webhook(url=WEBHOOK_URL)
+    await app.updater.start_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 8000)),
+        url_path=WEBHOOK_PATH,
+        webhook_url=WEBHOOK_URL,
+    )
+    await app.updater.idle()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
