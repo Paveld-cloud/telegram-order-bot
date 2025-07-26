@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import gspread
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, InputMediaAnimation
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -41,7 +41,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(text=item, callback_data=item)] for item in page]
     keyboard.append([InlineKeyboardButton(text="Ещё", callback_data="more")])
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🌹 Выберите сорт роз:", reply_markup=reply_markup)
+
+    # Удаление старого сообщения
+    if 'last_msg_id' in context.user_data:
+        try:
+            await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=context.user_data['last_msg_id'])
+        except: pass
+
+    # Анимация рассыпания (GIF)
+    gif_msg = await update.message.reply_animation(
+        animation="https://media.giphy.com/media/dxB9iUKDtw0mK/giphy.gif",
+        caption="✨ Обновляем список..."
+    )
+    await gif_msg.delete()
+
+    sent = await update.message.reply_text("🌹 Выберите сорт роз:", reply_markup=reply_markup)
+    context.user_data['last_msg_id'] = sent.message_id
     return PRODUCT
 
 async def more_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,13 +68,16 @@ async def more_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start_index = current_page * ITEMS_PER_PAGE
     end_index = start_index + ITEMS_PER_PAGE
     page = catalog[start_index:end_index]
+
     if not page:
         await query.edit_message_text("📦 Это был конец списка.")
         return PRODUCT
+
     user_state[user_id] = current_page
     keyboard = [[InlineKeyboardButton(text=item, callback_data=item)] for item in page]
     keyboard.append([InlineKeyboardButton(text="Ещё", callback_data="more")])
     reply_markup = InlineKeyboardMarkup(keyboard)
+
     await query.edit_message_text("🌹 Выберите сорт роз:", reply_markup=reply_markup)
     return PRODUCT
 
